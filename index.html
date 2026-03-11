@@ -569,13 +569,13 @@ input:focus {
     <div class="bk-card" id="bk-table"></div>
 
     <div class="email-card">
-      <div class="email-title">Email this summary to yourself</div>
-      <p class="email-sub">We'll send the results to your inbox for your records. One email, no spam.</p>
+      <div class="email-title">Download your results as a PDF</div>
+      <p class="email-sub">Enter your email and get a clean, printable summary instantly.</p>
       <div class="email-row">
         <input type="email" id="email-input" placeholder="your@email.com">
-        <button class="btn-email" onclick="sendEmail()">Send Results</button>
+        <button class="btn-email" onclick="sendEmail()">⬇ Download PDF</button>
       </div>
-      <div class="email-ok" id="email-ok">✓ Sent — check your inbox</div>
+      <div class="email-ok" id="email-ok">✓ Your PDF is downloading</div>
     </div>
 
     <button class="btn-reset" onclick="reset()">← Run Another Client</button>
@@ -679,7 +679,8 @@ input:focus {
     }
 
     document.getElementById('bk-table').innerHTML = rows;
-    window._r = { priorTax, priorAGI, paymentsMade, currentTax, safeHarborAmt, isSafe, shortfall, estimatedPenalty, balanceDue, safeHarborPct, isHighEarner, threshold90 };
+    const isBorderline = !isSafe && Math.abs(shortfall) < safeHarborAmt * 0.04;
+    window._r = { priorTax, priorAGI, paymentsMade, currentTax, safeHarborAmt, isSafe, isBorderline, shortfall, estimatedPenalty, balanceDue, safeHarborPct, isHighEarner, threshold90 };
 
     document.getElementById('calc-form').style.display = 'none';
     const res = document.getElementById('results');
@@ -704,29 +705,154 @@ input:focus {
     const r = window._r;
     if (!r) return;
 
+    // 1. Capture email via Formspree (fire and forget)
     const fd = new FormData();
     fd.append('email', email);
     fd.append('_subject', 'Safe Harbor Results — Valim.ai');
-    fd.append('verdict', r.isSafe ? 'SAFE' : 'NOT SAFE');
-    fd.append('prior_year_tax', r.priorTax);
-    fd.append('prior_year_agi', r.priorAGI);
-    fd.append('payments_made', r.paymentsMade);
-    fd.append('safe_harbor_amount', r.safeHarborAmt);
+    fd.append('verdict', r.isSafe ? 'SAFE' : r.isBorderline ? 'BORDERLINE' : 'NOT SAFE');
+    fd.append('prior_year_tax', fmt(r.priorTax));
+    fd.append('prior_year_agi', fmt(r.priorAGI));
+    fd.append('payments_made', fmt(r.paymentsMade));
+    fd.append('safe_harbor_amount', fmt(r.safeHarborAmt));
     fd.append('shortfall', fmt(Math.abs(r.shortfall)));
-    if (r.currentTax) fd.append('est_2025_tax', r.currentTax);
-    if (r.estimatedPenalty) fd.append('estimated_penalty', fmt(r.estimatedPenalty));
-
+    if (r.currentTax) fd.append('est_2025_tax', fmt(r.currentTax));
     fetch('https://formspree.io/f/xdawgelz', {
       method: 'POST', body: fd, headers: { 'Accept': 'application/json' }
-    }).then(() => {
-      document.getElementById('email-ok').style.display = 'block';
-    }).catch(() => {
-      const subj = encodeURIComponent('Safe Harbor Results — Valim.ai');
-      const body = encodeURIComponent(`Safe Harbor Checker\nValim.ai\n\nVerdict: ${r.isSafe?'SAFE':'NOT SAFE'}\nPrior Year Tax: ${fmt(r.priorTax)}\nSafe Harbor Threshold: ${fmt(r.safeHarborAmt)}\nPayments Made: ${fmt(r.paymentsMade)}\nShortfall/Surplus: ${r.isSafe?'+':'-'}${fmt(Math.abs(r.shortfall))}${r.estimatedPenalty?'\nEst. Penalty: ~'+fmt(r.estimatedPenalty):''}\n\nhttps://valim.ai`);
-      window.location.href = `mailto:${email}?subject=${subj}&body=${body}`;
-      document.getElementById('email-ok').style.display = 'block';
+    }).catch(() => {});
+
+    // 2. Generate PDF client-side
+    generatePDF(r, email);
+    document.getElementById('email-ok').style.display = 'block';
+  }
+
+  function generatePDF(r, email) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    const W = doc.internal.pageSize.getWidth();
+    const purple = [124, 58, 237];
+    const lightPurple = [237, 233, 254];
+    const darkGray = [30, 30, 30];
+    const midGray = [90, 90, 90];
+    const lineGray = [220, 220, 220];
+
+    // Header bar
+    doc.setFillColor(...purple);
+    doc.rect(0, 0, W, 70, 'F');
+
+    // Logo text
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Valim AI', 40, 42);
+
+    // Tool name
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(210, 200, 255);
+    doc.text('1040 Safe Harbor Checker', 40, 58);
+
+    // Date top right
+    const today = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    doc.setFontSize(9);
+    doc.setTextColor(210, 200, 255);
+    doc.text(today, W - 40, 42, { align: 'right' });
+
+    // Verdict banner
+    const verdict = r.isSafe ? 'SAFE' : r.isBorderline ? 'BORDERLINE' : 'NOT SAFE';
+    const verdictColor = r.isSafe ? [22, 163, 74] : r.isBorderline ? [217, 119, 6] : [220, 38, 38];
+    doc.setFillColor(...verdictColor);
+    doc.roundedRect(40, 90, W - 80, 54, 6, 6, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(255, 255, 255);
+    doc.text(verdict, W / 2, 121, { align: 'center' });
+
+    // Verdict subtitle
+    let sub = '';
+    if (r.isSafe) sub = `Client met the ${r.safeHarborPct} prior-year safe harbor threshold.`;
+    else if (r.isBorderline) sub = `Slim miss — shortfall of ${fmt(Math.abs(r.shortfall))}.`;
+    else sub = `Shortfall of ${fmt(Math.abs(r.shortfall))} — underpayment likely.`;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...midGray);
+    doc.text(sub, W / 2, 160, { align: 'center' });
+
+    // Section: Results breakdown
+    let y = 195;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...darkGray);
+    doc.text('Results Breakdown', 40, y);
+    y += 6;
+    doc.setDrawColor(...lineGray);
+    doc.setLineWidth(1);
+    doc.line(40, y, W - 40, y);
+    y += 18;
+
+    const rows = [
+      ['Prior Year Tax (Line 24)', fmt(r.priorTax)],
+      ['Prior Year AGI (Line 11)', fmt(r.priorAGI)],
+      ['Safe Harbor Threshold (' + r.safeHarborPct + ')', fmt(r.safeHarborAmt)],
+      ['2025 Payments Made', fmt(r.paymentsMade)],
+      ['Surplus / (Shortfall)', (r.shortfall >= 0 ? '+' : '-') + fmt(Math.abs(r.shortfall))],
+    ];
+    if (r.currentTax) rows.push(['Est. 2025 Tax', fmt(r.currentTax)]);
+
+    rows.forEach(([label, value], i) => {
+      if (i % 2 === 0) {
+        doc.setFillColor(248, 246, 255);
+        doc.rect(40, y - 13, W - 80, 22, 'F');
+      }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...midGray);
+      doc.text(label, 52, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...darkGray);
+      doc.text(value, W - 52, y, { align: 'right' });
+      y += 24;
     });
+
+    // Divider
+    y += 8;
+    doc.setDrawColor(...lineGray);
+    doc.line(40, y, W - 40, y);
+    y += 20;
+
+    // What this means section
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...darkGray);
+    doc.text('What This Means', 40, y);
+    y += 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...midGray);
+
+    let explanation = '';
+    if (r.isSafe) {
+      explanation = `Your client has met the IRS safe harbor requirement under IRC §6654. They are protected from\nunderpayment penalties regardless of any balance due on April 15, 2026. No further action\nneeded on estimated tax payments for 2025.`;
+    } else if (r.isBorderline) {
+      explanation = `Your client narrowly missed the safe harbor threshold by ${fmt(Math.abs(r.shortfall))}. A small\nunderpayment penalty may apply, but it will be minimal. Consider reviewing with the client\nbefore the April 15, 2026 filing deadline.`;
+    } else {
+      explanation = `Your client did not meet the IRS safe harbor threshold. An underpayment penalty is likely\nto apply on the ${fmt(Math.abs(r.shortfall))} shortfall. Review withholding and estimated\npayments before the April 15, 2026 filing deadline.`;
+    }
+    doc.text(explanation, 40, y);
+    y += 75;
+
+    // Footer
+    doc.setFillColor(...lightPurple);
+    doc.rect(0, doc.internal.pageSize.getHeight() - 50, W, 50, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...purple);
+    doc.text('For estimation only. Safe harbor per IRC §6654 and IRS Form 2210. Does not cover farmers/fishers, MFS filers, or annualized income method.', W / 2, doc.internal.pageSize.getHeight() - 30, { align: 'center', maxWidth: W - 80 });
+    doc.setFont('helvetica', 'bold');
+    doc.text('valim.ai', W / 2, doc.internal.pageSize.getHeight() - 14, { align: 'center' });
+
+    doc.save('safe-harbor-results.pdf');
   }
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
 </html>
