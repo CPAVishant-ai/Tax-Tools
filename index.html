@@ -511,6 +511,7 @@ input:focus {
       <span class="badge"><span class="dot"></span>Built by CPAs</span>
       <span class="badge"><span class="dot"></span>IRS §6654 compliant</span>
       <span class="badge"><span class="dot"></span>Zero data stored</span>
+      <span class="badge" id="counter-badge" style="display:none;"><span class="dot"></span><span id="counter-text"></span></span>
     </div>
   </div>
 
@@ -681,6 +682,11 @@ input:focus {
     document.getElementById('bk-table').innerHTML = rows;
     const isBorderline = !isSafe && Math.abs(shortfall) < safeHarborAmt * 0.04;
     window._r = { priorTax, priorAGI, paymentsMade, currentTax, safeHarborAmt, isSafe, isBorderline, shortfall, estimatedPenalty, balanceDue, safeHarborPct, isHighEarner, threshold90 };
+
+    fetch('https://api.counterapi.dev/v1/valim-ai/safe-harbor/up')
+      .then(r => r.json())
+      .then(d => { if (d.count) { document.getElementById('counter-text').textContent = Number(d.count).toLocaleString() + ' checks run'; document.getElementById('counter-badge').style.display = 'inline-flex'; }})
+      .catch(() => {});
 
     document.getElementById('calc-form').style.display = 'none';
     const res = document.getElementById('results');
@@ -854,5 +860,11 @@ input:focus {
   }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  fetch('https://api.counterapi.dev/v1/valim-ai/safe-harbor')
+    .then(r => r.json())
+    .then(d => { if (d.count && d.count > 0) { document.getElementById('counter-text').textContent = Number(d.count).toLocaleString() + ' checks run'; document.getElementById('counter-badge').style.display = 'inline-flex'; }})
+    .catch(() => {});
+</script>
 </body>
 </html>
