@@ -685,7 +685,7 @@ input:focus {
 
     fetch('https://api.counterapi.dev/v1/valim-ai/safe-harbor/up')
       .then(r => r.json())
-      .then(d => { if (d.count) document.getElementById('counter-text').textContent = '🧮 ' + (Number(d.count) + 5).toLocaleString() + ' tax pros helped'; })
+      .then(d => { if (d.count) document.getElementById('counter-text').textContent = '🧮 ' + (Number(d.count) + 39).toLocaleString() + ' tax pros helped'; })
       .catch(() => {});
 
     document.getElementById('calc-form').style.display = 'none';
@@ -863,7 +863,7 @@ input:focus {
 <script>
   fetch('https://api.counterapi.dev/v1/valim-ai/safe-harbor')
     .then(r => r.json())
-    .then(d => { if (d.count) document.getElementById('counter-text').textContent = '🧮 ' + (Number(d.count) + 5).toLocaleString() + ' tax pros helped'; })
+    .then(d => { if (d.count) document.getElementById('counter-text').textContent = '🧮 ' + (Number(d.count) + 39).toLocaleString() + ' tax pros helped'; })
     .catch(() => {});
 </script>
 </body>
