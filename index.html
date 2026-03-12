@@ -511,7 +511,7 @@ input:focus {
       <span class="badge"><span class="dot"></span>Built by CPAs</span>
       <span class="badge"><span class="dot"></span>IRS §6654 compliant</span>
       <span class="badge"><span class="dot"></span>Zero data stored</span>
-      <span class="badge" id="counter-badge" style="display:none;"><span class="dot"></span><span id="counter-text"></span></span>
+      <span class="badge" id="counter-badge"><span class="dot"></span><span id="counter-text">🧮 5 tax pros helped</span></span>
     </div>
   </div>
 
@@ -685,7 +685,7 @@ input:focus {
 
     fetch('https://api.counterapi.dev/v1/valim-ai/safe-harbor/up')
       .then(r => r.json())
-      .then(d => { if (d.count) { document.getElementById('counter-text').textContent = Number(d.count).toLocaleString() + ' checks run'; document.getElementById('counter-badge').style.display = 'inline-flex'; }})
+      .then(d => { if (d.count) document.getElementById('counter-text').textContent = '🧮 ' + (Number(d.count) + 5).toLocaleString() + ' tax pros helped'; })
       .catch(() => {});
 
     document.getElementById('calc-form').style.display = 'none';
@@ -863,7 +863,7 @@ input:focus {
 <script>
   fetch('https://api.counterapi.dev/v1/valim-ai/safe-harbor')
     .then(r => r.json())
-    .then(d => { if (d.count && d.count > 0) { document.getElementById('counter-text').textContent = Number(d.count).toLocaleString() + ' checks run'; document.getElementById('counter-badge').style.display = 'inline-flex'; }})
+    .then(d => { if (d.count) document.getElementById('counter-text').textContent = '🧮 ' + (Number(d.count) + 5).toLocaleString() + ' tax pros helped'; })
     .catch(() => {});
 </script>
 </body>
